@@ -6,4 +6,4 @@ if (location.hostname === "namu-dw.com") {
   apiGlobalURL = "http://127.0.0.1:8000";
 //   apiGlobalURL = "https://250204.aisystem64.org";
   console.log("Using Local API URL");
-} 
+}
