@@ -1,7 +1,8 @@
-// scrip.js
+// script.js
 
 // ★★★ 전역 상수
-const API_BASE_URL = apiGlobalURL + '/api/articles';
+// index.html 등에서 apiGlobalURL이 정의되어 있다고 가정, 없으면 빈 문자열 처리
+const API_BASE_URL = (typeof apiGlobalURL !== 'undefined' ? apiGlobalURL : '') + '/api/articles';
 const SMART_STORE_URL = 'https://smartstore.naver.com/namu_dw';
 const INSTA_URL = 'https://www.instagram.com/namu_dw/';
 
@@ -13,6 +14,7 @@ if (typeof window.CAPTURE_PREVIEW_SCALE !== 'number') {
   window.CAPTURE_PREVIEW_SCALE = 0.6;
 }
 
+// DOM 요소 가져오기
 const screenList = document.getElementById('screenList');
 const screenCamera = document.getElementById('screenCamera');
 const stepIndicator = document.getElementById('stepIndicator');
@@ -34,7 +36,7 @@ const plantMain = document.getElementById('plantMain');
 const plantNameLabel = document.getElementById('plantNameLabel');
 const captureBtn = document.getElementById('captureBtn');
 const shareBtn = document.getElementById('shareBtn');
-const purchaseBtn = document.getElementById('purchaseBtn');
+const purchaseBtn = document.getElementById('purchaseBtn'); // 식물 구입 버튼
 const toastEl = document.getElementById('toast');
 const cameraStage = document.querySelector('.camera-stage');
 const rotateBtn = document.getElementById('rotateBtn');
@@ -49,11 +51,12 @@ const captureResult = document.getElementById('captureResult');
 const capturedImage = document.getElementById('capturedImage');
 const captureCloseBtn = document.getElementById('captureCloseBtn');
 
-const instaBtn = document.getElementById('instaBtn');
-const smartStoreBtn = document.getElementById('smartStoreBtn');
+// 인스타그램/스토어 버튼 (인트로 화면)
+const instaBtn = document.querySelector('.store-btn--insta');
+const smartStoreBtn = document.querySelector('.store-btn--smart');
 
-instaBtn.href = INSTA_URL;
-smartStoreBtn.href = SMART_STORE_URL;
+if (instaBtn) instaBtn.href = INSTA_URL;
+if (smartStoreBtn) smartStoreBtn.href = SMART_STORE_URL;
 
 let isCameraMode = true;
 let cameraStream = null;
@@ -61,10 +64,8 @@ let selectedPlant = null;
 let toastTimeout = null;
 let currentSizeFilter = 'ALL';
 
-// ★★★ 로딩 상태
+// ★★★ 로딩 상태 및 데이터
 let isPlantLoading = false;
-
-// ★★★ DB에서 가져온 식물 리스트
 let plants = [];
 
 // ★★★ 로딩 스켈레톤 표시 함수
@@ -73,7 +74,6 @@ function setPlantLoading(flag) {
   plantGrid.innerHTML = '';
   if (flag) {
     plantGrid.classList.add('loading');
-    // 스켈레톤 카드 6개 정도
     const count = 6;
     for (let i = 0; i < count; i++) {
       const card = document.createElement('div');
@@ -94,7 +94,7 @@ function setPlantLoading(flag) {
 async function fetchPlantList() {
   setPlantLoading(true);
   try {
-    const res = await fetch(`${API_BASE_URL}/plants/`, {
+    const res = await fetch(`${API_BASE_URL}/plants/?sold_out=true&image=false`, {
       method: 'GET'
     });
     if (!res.ok) {
@@ -104,6 +104,7 @@ async function fetchPlantList() {
     const results = data.results || [];
 
     plants = results.map(p => {
+      // 1. 사이즈 라벨 처리
       let sizeCategory = p.status_label;
       if (!sizeCategory && p.status) {
         if (p.status === 'B') sizeCategory = '대형';
@@ -111,12 +112,14 @@ async function fetchPlantList() {
         else if (p.status === 'S') sizeCategory = '소형';
       }
 
+      // 2. 사이즈 cm 처리
       let sizeCm = '';
       if (p.size) {
         const raw = String(p.size).trim();
         sizeCm = raw.toLowerCase().endsWith('cm') ? raw : `${raw}cm`;
       }
 
+      // 3. 이미지 처리
       let thumbSrc = '';
       if (p.image_base64) {
         thumbSrc = p.image_base64.startsWith('data:')
@@ -126,10 +129,17 @@ async function fetchPlantList() {
         thumbSrc = 'plant/placeholder.png';
       }
 
+      // ★★★ [수정됨] 숫자 ID를 받아 전체 URL로 변환하여 저장
+      let finalLink = SMART_STORE_URL; // 기본값
+      if (p.link) {
+        // API에서 "12345" 같은 숫자만 온다고 가정하고 URL 조합
+        finalLink = `${SMART_STORE_URL}/products/${p.link}`;
+      }
+
       return {
         id: p.id,
         name: p.name || '이름 없는 식물',
-        link: p.link || null,
+        link: finalLink, // 이제 여기에는 항상 완전한 https 주소가 들어감
         sizeCategory: sizeCategory || '중형',
         sizeCm: sizeCm,
         price: p.price ?? null,
@@ -167,25 +177,20 @@ function renderPlantList() {
     card.type = 'button';
     card.className = 'plant-card';
     card.dataset.plantId = plant.id;
-    card.dataset.plantName = plant.name;
-    card.dataset.plantLink = plant.link || '';
-    card.dataset.plantSizeCategory = plant.sizeCategory;
-    card.dataset.plantSizeCm = plant.sizeCm;
-    card.dataset.plantPrice = plant.price != null ? String(plant.price) : '';
-
+    
     const priceText = plant.price != null ? plant.price.toLocaleString() + '원' : '';
 
     card.innerHTML = `
-  ${priceText ? `<div class="plant-price-chip">${priceText}</div>` : ''}
-  <img src="${plant.thumbSrc}" alt="${plant.name}" class="plant-thumb" loading="lazy">
-  <div class="plant-label">
-    <div class="plant-label-name">${plant.name}</div>
-    <div class="plant-label-meta">
-      <span>${plant.sizeCategory}</span>
-      ${plant.sizeCm ? `<span class="meta-dot">·</span><span>${plant.sizeCm}</span>` : ''}
-    </div>
-  </div>
-`;
+      ${priceText ? `<div class="plant-price-chip">${priceText}</div>` : ''}
+      <img src="${plant.thumbSrc}" alt="${plant.name}" class="plant-thumb" loading="lazy">
+      <div class="plant-label">
+        <div class="plant-label-name">${plant.name}</div>
+        <div class="plant-label-meta">
+          <span>${plant.sizeCategory}</span>
+          ${plant.sizeCm ? `<span class="meta-dot">·</span><span>${plant.sizeCm}</span>` : ''}
+        </div>
+      </div>
+    `;
 
     card.addEventListener('click', () => onSelectPlant(plant));
     plantGrid.appendChild(card);
@@ -216,7 +221,7 @@ function onSelectPlant(plant) {
   plantShadow.src = plant.thumbSrc;
   plantMain.src = plant.thumbSrc;
 
-  // ★★★ 카메라 상단: 이름 + 높이 같이 표시
+  // 카메라 상단 라벨
   if (plant.sizeCm) {
     plantNameLabel.textContent = `${plant.name} · ${plant.sizeCategory} · ${plant.sizeCm}`;
   } else {
@@ -344,6 +349,7 @@ function getAngle(t1, t2) {
   return Math.atan2(dy, dx) * 180 / Math.PI;
 }
 
+// 터치 이벤트
 cameraStage.addEventListener('touchstart', (e) => {
   if (e.target.closest('.camera-controls')) return;
   e.preventDefault();
@@ -400,6 +406,7 @@ cameraStage.addEventListener('touchend', (e) => {
   lastTouchCount = e.touches.length;
 });
 
+// 마우스 이벤트
 let isMouseDown = false;
 let mouseStartX = 0;
 let mouseStartY = 0;
@@ -475,6 +482,7 @@ captureBtn.addEventListener('click', () => {
   captureCanvas.height = stageRect.height;
   const ctx = captureCanvas.getContext('2d');
 
+  // 배경 그리기
   if (isCameraMode) {
     if (cameraVideo && cameraVideo.videoWidth > 0) {
       drawObjectFitCover(ctx, cameraVideo, captureCanvas.width, captureCanvas.height);
@@ -485,6 +493,7 @@ captureBtn.addEventListener('click', () => {
     }
   }
 
+  // 식물 그리기
   const plantRect = plantInner.getBoundingClientRect();
   const scaleX = captureCanvas.width / stageRect.width;
   const scaleY = captureCanvas.height / stageRect.height;
@@ -513,6 +522,7 @@ captureBtn.addEventListener('click', () => {
 
   ctx.restore();
 
+  // 회전 보정 (결과 화면이 가로인지 세로인지 판별)
   const normRot = ((currentRotation % 360) + 360) % 360;
   let finalCanvas = captureCanvas;
   let finalCtx = ctx;
@@ -535,6 +545,7 @@ captureBtn.addEventListener('click', () => {
     finalCtx = rCtx;
   }
 
+  // 워터마크 그리기
   if (headerLogo && headerLogo.complete && headerLogo.naturalWidth > 0) {
     const logoW = Math.min(100, finalCanvas.width * 0.25);
     const logoH = logoW * (headerLogo.naturalHeight / headerLogo.naturalWidth);
@@ -542,13 +553,11 @@ captureBtn.addEventListener('click', () => {
 
     finalCtx.shadowColor = 'transparent';
     finalCtx.shadowBlur = 0;
-    finalCtx.shadowOffsetX = 0;
-    finalCtx.shadowOffsetY = 0;
-
     finalCtx.drawImage(headerLogo, margin, margin, logoW, logoH);
   }
 
   try {
+    // 최종 이미지 생성
     capturedImage.src = finalCanvas.toDataURL('image/png');
     if (!isSide) {
       capturedImage.style.width = '100%';
@@ -560,11 +569,13 @@ captureBtn.addEventListener('click', () => {
       capturedImage.style.objectFit = 'contain';
     }
 
-    // ★★★ 식물 구입 버튼 링크 설정 (없으면 스마트스토어)
-    const plantLink = selectedPlant && selectedPlant.link ? selectedPlant.link : SMART_STORE_URL;
-    purchaseBtn.href = plantLink || SMART_STORE_URL;
-    purchaseBtn.target = '_blank';
-    purchaseBtn.rel = 'noopener';
+    // ★★★ [수정됨] 구입 버튼 링크 설정
+    if (purchaseBtn) {
+      // selectedPlant.link에는 fetchPlantList에서 생성한 완전한 URL이 들어있습니다.
+      purchaseBtn.href = (selectedPlant && selectedPlant.link) ? selectedPlant.link : SMART_STORE_URL;
+      purchaseBtn.target = '_blank';
+      purchaseBtn.rel = 'noopener';
+    }
 
     captureResult.classList.add('active');
     setStep(3);
@@ -584,7 +595,7 @@ shareBtn.addEventListener('click', async () => {
       await navigator.share({
         files: [file],
         title: '나무다운',
-        text: '우리 집에 어울리는 식물을 배치해보세요!',
+        text: '공간에 어울리는 나무다운 식물을 배치해보세요!',
       });
     } else {
       showToast('이 브라우저에서는 공유 기능을 지원하지 않습니다.');
@@ -664,6 +675,6 @@ window.addEventListener('touchend', () => sDragging = false);
 window.addEventListener('resize', updateSliderThumbPosition);
 
 // 초기화
-fetchPlantList();             // ★★★ DB에서 식물 리스트 가져오기 (로딩 애니메이션 포함)
+fetchPlantList();             
 resetPlantTransformAndSlider();
 setStep(1);
