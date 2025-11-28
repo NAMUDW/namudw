@@ -51,6 +51,7 @@ const captureResult = document.getElementById('captureResult');
 const capturedImage = document.getElementById('capturedImage');
 const captureCloseBtn = document.getElementById('captureCloseBtn');
 const changePlantResultBtn = document.getElementById('changePlantResultBtn');
+const refreshBtn = document.getElementById('refreshBtn');
 
 // 인스타그램/스토어 버튼 (인트로 화면)
 const instaBtn = document.querySelector('.store-btn--insta');
@@ -92,10 +93,11 @@ function setPlantLoading(flag) {
 }
 
 // ★★★ Plant API 호출
+// ★★★ Plant API 호출
 async function fetchPlantList() {
   setPlantLoading(true);
   try {
-    const res = await fetch(`${API_BASE_URL}/plants/?sold_out=true&image=false`, {
+    const res = await fetch(`${API_BASE_URL}/plants/?sold_out=true`, {
       method: 'GET'
     });
     if (!res.ok) {
@@ -127,7 +129,8 @@ async function fetchPlantList() {
           ? p.image_base64
           : 'data:image/png;base64,' + p.image_base64;
       } else {
-        thumbSrc = 'plant/placeholder.png';
+        // ★ 여기만 변경
+        thumbSrc = 'img/dummy-plant.png';
       }
 
       // ★★★ [수정됨] 숫자 ID를 받아 전체 URL로 변환하여 저장
@@ -167,9 +170,9 @@ function renderPlantList() {
 
   if (!filtered.length) {
     plantGrid.innerHTML = `
-          <div style="grid-column: 1 / -1; text-align:center; font-size:12px; color:#9ca3af; padding:16px 0;">
-            표시할 식물이 없습니다.
-          </div>`;
+      <div style="grid-column: 1 / -1; text-align:center; font-size:12px; color:#9ca3af; padding:16px 0;">
+        표시할 식물이 없습니다.
+      </div>`;
     return;
   }
 
@@ -206,6 +209,59 @@ sizeTabs.querySelectorAll('.size-tab').forEach(tab => {
     renderPlantList();
   });
 });
+
+// ★★★ SmartStore 품절/누락 동기화 + 리스트 새로고침
+async function syncSoldoutAndReload() {
+  if (!refreshBtn) return;
+
+  // 이미 로딩 중이면 중복 요청 방지
+  if (refreshBtn.dataset.loading === '1') return;
+
+  refreshBtn.dataset.loading = '1';
+  refreshBtn.classList.add('loading');
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/plant-smartstore-sync/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({}) // 백엔드에서 html이 필요 없다고 가정
+    });
+
+    if (!res.ok) {
+      console.error('품절 동기화 실패 - HTTP 상태 코드:', res.status);
+      throw new Error('sync API error: ' + res.status);
+    }
+
+    // 필요하면 응답 내용도 확인 가능
+    // const data = await res.json();
+
+    console.log('품절 동기화 성공');
+    showToast('품절 상태를 새로고침했습니다.');
+  } catch (err) {
+    // console.error('품절 동기화 중 오류 발생:', err);
+    console.log('품절 동기화 실패');
+    // showToast('품절 상태 새로고침에 실패했습니다.');
+  } finally {
+    try {
+      // ★★★ 성공/실패 관계없이 항상 리스트 새로고침
+      await fetchPlantList();
+    } catch (listErr) {
+      console.error('식물 리스트 새로고침 중 오류:', listErr);
+    }
+
+    refreshBtn.dataset.loading = '0';
+    refreshBtn.classList.remove('loading');
+  }
+}
+
+// 새로고침 버튼 클릭 시 동기화 실행
+if (refreshBtn) {
+  refreshBtn.addEventListener('click', () => {
+    syncSoldoutAndReload();
+  });
+}
 
 function setStep(step) {
   if (step === 1) {
