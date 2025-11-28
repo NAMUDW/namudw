@@ -790,6 +790,23 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+
+      /* ✅ 우측 하단 버튼 포지셔닝 기준 */
+      position: relative;
+    }
+
+    /* ✅ 식물 선택 버튼: capture-card 우측 하단 고정 */
+    .capture-change-btn {
+      position: absolute;
+      right: 0px;
+      bottom: -50px;
+
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+
+      padding-inline: 10px 12px;
+      font-size: 11px;
     }
 
     .capture-header {
@@ -829,7 +846,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative; /* ✅ 공유 버튼 오버랩용 */
+      position: relative;
+      /* ✅ 공유 버튼 오버랩용 */
     }
 
     .capture-preview img {
@@ -882,37 +900,38 @@
     }
 
     .btn-share {
-  background: rgba(55, 65, 81, 0.8);
-  border: 1px solid rgba(148, 163, 184, 0.6);
-  color: #e5e7eb;
+      background: rgba(55, 65, 81, 0.8);
+      border: 1px solid rgba(148, 163, 184, 0.6);
+      color: #e5e7eb;
 
-  /* ✅ 더 크고 동그란 버튼 */
-  width: 56px;
-  height: 56px;
-  border-radius: 999px;
+      /* ✅ 더 크고 동그란 버튼 */
+      width: 56px;
+      height: 56px;
+      border-radius: 999px;
 
-  display: inline-flex;
-  flex-direction: column;     /* 아이콘 위, 글자 아래 */
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
+      display: inline-flex;
+      flex-direction: column;
+      /* 아이콘 위, 글자 아래 */
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
 
-  padding: 6px 0 4px;
-  font-size: 16px;
-  cursor: pointer;
-}
+      padding: 6px 0 4px;
+      font-size: 16px;
+      cursor: pointer;
+    }
 
-/* 아이콘, 라벨 개별 스타일(선택사항이지만 깔끔하게 분리) */
-.btn-share-icon svg {
-  width: 18px;
-  height: 18px;
-  display: block;
-}
+    /* 아이콘, 라벨 개별 스타일(선택사항이지만 깔끔하게 분리) */
+    .btn-share-icon svg {
+      width: 18px;
+      height: 18px;
+      display: block;
+    }
 
-.btn-share-label {
-  font-size: 10px;
-  letter-spacing: -0.02em;
-}
+    .btn-share-label {
+      font-size: 10px;
+      letter-spacing: -0.02em;
+    }
 
     .capture-note {
       font-size: 11px;
@@ -922,15 +941,16 @@
     .capture-footer-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 8px;
+      justify-content: center;
+      /* ✅ 가운데 정렬 */
       margin-top: 6px;
     }
 
     .capture-footer-row .capture-note {
       font-size: 11px;
       color: #9ca3af;
-      flex: 1 1 auto;
+      text-align: center;
+      /* ✅ 텍스트 중앙 정렬 */
     }
 
     .capture-footer-row .btn {
@@ -1049,10 +1069,10 @@
       -webkit-user-select: none;
     }
 
-    .icon-arrow {
-      font-size: 20px;
-      line-height: 1;
-      color: #e5e7eb;
+    .icon-arrow-svg {
+      width: 18px;
+      height: 18px;
+      display: block;
     }
   </style>
 
@@ -1231,8 +1251,15 @@
               <span class="control-label">초기화</span>
             </div>
             <div class="control-group">
-              <button class="size-btn-small icon-arrow" id="changePlantBtn" aria-label="다른 식물 선택">
-                <span class="icon-arrow">↩</span>
+              <button class="size-btn-small" id="changePlantBtn" aria-label="다른 식물 선택">
+                <svg class="icon-arrow-svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <!-- 곡선으로 들어가서 왼쪽 화살표가 되는 리턴 아이콘 -->
+                  <path d="M16 4
+           a4 4 0 0 1 0 8
+           H7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                  <path d="M7 12l4-4M7 12l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                    stroke-linejoin="round" />
+                </svg>
               </button>
               <span class="control-label">다른 식물</span>
             </div>
@@ -1262,26 +1289,25 @@
         </div>
 
         <div class="capture-preview">
-  <img id="capturedImage" src="" alt="Captured plant preview" />
+          <img id="capturedImage" src="" alt="Captured plant preview" />
 
-  <!-- ✅ 이미지 우측 하단 오버랩 -->
-  <div class="capture-share-overlay">
-    <button class="btn btn-share" id="shareBtn" aria-label="공유하기">
-      <span class="btn-share-icon">
-        <svg viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="18" cy="5" r="3"></circle>
-          <circle cx="6" cy="12" r="3"></circle>
-          <circle cx="18" cy="19" r="3"></circle>
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-        </svg>
-      </span>
-      <span class="btn-share-label">공유</span>
-    </button>
-  </div>
-</div>
+          <!-- ✅ 이미지 우측 하단 오버랩 -->
+          <div class="capture-share-overlay">
+            <button class="btn btn-share" id="shareBtn" aria-label="공유하기">
+              <span class="btn-share-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <circle cx="18" cy="5" r="3"></circle>
+                  <circle cx="6" cy="12" r="3"></circle>
+                  <circle cx="18" cy="19" r="3"></circle>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+              </span>
+              <span class="btn-share-label">공유</span>
+            </button>
+          </div>
+        </div>
 
         <div class="capture-actions">
           <div class="capture-actions-main">
@@ -1291,15 +1317,27 @@
 
           <div class="capture-footer-row">
             <div class="capture-note">
-              이미지를 길게 눌러 사진첩에 저장하거나,<br> 캡처 화면을 바로 공유해 보세요.
+              이미지를 길게 눌러 사진첩에 저장하거나,
+              캡처 화면을 바로 공유해 보세요.
             </div>
-            <button class="btn btn-outline" id="changePlantResultBtn">
-              ↩ 식물 선택
-            </button>
           </div>
         </div>
-      </div>
+      <!-- ✅ 카드 우측 하단에 붙일 버튼 -->
+      <button class="btn btn-outline capture-change-btn" id="changePlantResultBtn">
+        <svg class="icon-arrow-svg" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M16 4
+             a4 4 0 0 1 0 8
+             H7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M7 12l4-4M7 12l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round" />
+        </svg>
+        <span>식물 선택</span>
+      </button>
     </div>
+
+      </div>
+
+
 
     <div class="mode-dialog-backdrop" id="modeDialog">
       <div class="mode-dialog">
