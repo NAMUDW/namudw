@@ -50,6 +50,7 @@ const captureCanvas = document.getElementById('captureCanvas');
 const captureResult = document.getElementById('captureResult');
 const capturedImage = document.getElementById('capturedImage');
 const captureCloseBtn = document.getElementById('captureCloseBtn');
+const changePlantResultBtn = document.getElementById('changePlantResultBtn');
 
 // 인스타그램/스토어 버튼 (인트로 화면)
 const instaBtn = document.querySelector('.store-btn--insta');
@@ -610,6 +611,15 @@ captureCloseBtn.addEventListener('click', () => {
   captureResult.classList.remove('active');
   setStep(2);
 });
+
+// 결과 화면에서 바로 "다른 식물" 선택
+if (changePlantResultBtn) {
+  changePlantResultBtn.addEventListener('click', () => {
+    // 결과 모달 닫고 리스트 화면으로 이동
+    captureResult.classList.remove('active');
+    showListScreen();      // 이미 위에서 정의된 함수 재사용
+  });
+}
 
 function drawObjectFitCover(ctx, source, cw, ch) {
   const sw = source.videoWidth || source.naturalWidth;
