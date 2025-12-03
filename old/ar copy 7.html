@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>나무다운 - 공간 배치 미리보기</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg-dark: #050509;
+      --bg-card: rgba(10, 10, 20, 0.92);
+      --accent: #4ade80;
+      --accent-soft: rgba(74, 222, 128, 0.18);
+      --text-main: #f9fafb;
+      --text-sub: #9ca3af;
+      --border-subtle: rgba(148, 163, 184, 0.25);
+    }
+
+    html, body { touch-action: none; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #0f172a 0, #020617 50%, #000 100%);
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .app {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 공통 상단 헤더 */
+    .app-header {
+      position: absolute;
+      top: calc(env(safe-area-inset-top, 0) + 24px);
+      left: 0;
+      right: 0;
+      z-index: 20;
+      padding: 12px 18px 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .app-title {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      pointer-events: auto;
+    }
+
+    .app-title-main {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .app-title-sub {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    .step-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--border-subtle);
+      font-size: 11px;
+      color: var(--text-sub);
+      pointer-events: auto;
+    }
+
+    .step-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-soft);
+    }
+
+    /* 화면 전환용 레이아웃 */
+    .screen {
+      position: absolute;
+      inset: 0;
+      padding: calc(90px + env(safe-area-inset-top, 0)) 16px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(12px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    .screen.active {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    /* ===== 식물 선택 화면 ===== */
+    .screen-list { background: transparent; }
+
+    .intro-card {
+      background: var(--bg-card);
+      border-radius: 18px;
+      padding: 14px 14px 12px;
+      border: 1px solid var(--border-subtle);
+      box-shadow: 0 18px 45px rgba(15, 23, 42, 0.7);
+    }
+
+    .intro-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .intro-desc {
+      font-size: 12px;
+      color: var(--text-sub);
+      line-height: 1.4;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .tag {
+      font-size: 11px;
+      padding: 4px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(31, 41, 55, 0.9);
+      color: var(--text-sub);
+    }
+
+    .tag.highlight {
+      border-color: var(--accent-soft);
+      color: var(--accent);
+      background: rgba(22, 101, 52, 0.45);
+    }
+
+    .plant-grid {
+      margin-top: 10px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      padding-bottom: 8px;
+    }
+
+    .plant-card {
+      position: relative;
+      border-radius: 14px;
+      overflow: hidden;
+      background: radial-gradient(circle at top, #f9fafb 0, #e5e7eb 40%, #d1d5db 100%);
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      padding: 6px 6px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      min-height: 112px;
+      cursor: pointer;
+      touch-action: manipulation;
+      transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+    }
+
+    .plant-card:active {
+      transform: translateY(1px) scale(0.98);
+      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.45);
+      border-color: var(--accent);
+      background: radial-gradient(circle at top, #fefce8 0, #e5e7eb 45%, #d1d5db 100%);
+    }
+
+    .plant-thumb {
+      width: 100%;
+      aspect-ratio: 3 / 4;
+      object-fit: contain;
+      filter: drop-shadow(0 6px 10px rgba(15, 23, 42, 0.45));
+      pointer-events: none;
+    }
+
+    .plant-label {
+      margin-top: 4px;
+      font-size: 11px;
+      color: #4b5563;
+      text-align: center;
+    }
+
+    .plant-size-chip {
+      position: absolute;
+      left: 6px;
+      top: 6px;
+      font-size: 10px;
+      padding: 3px 6px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.5);
+      color: var(--text-sub);
+    }
+
+    .bottom-helper {
+      margin-top: auto;
+      font-size: 11px;
+      color: var(--text-sub);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 0 2px 4px;
+    }
+
+    .bottom-helper span {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .dot-accent {
+      width: 5px;
+      height: 5px;
+      border-radius: 999px;
+      background: var(--accent);
+    }
+
+    /* ===== 카메라 화면 ===== */
+
+    .screen-camera { padding: 0; }
+
+    .camera-stage {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+      touch-action: none;
+    }
+
+    video {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      top: 0;
+      left: 0;
+      background: #000;
+    }
+
+    .plant-wrapper {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate3d(-50%, -50%, 0) scale(1) rotate(0deg);
+    }
+
+    .plant-wrapper-inner {
+      position: relative;
+      width: 45vw;
+      max-width: 45vw;
+      height: auto;
+    }
+
+    .plant-image {
+      width: 100%;
+      height: auto;
+      user-select: none;
+      pointer-events: none;
+      display: block;
+    }
+
+    #plantShadow {
+      position: absolute;
+      top: 0;
+      left: 0;
+      filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.85));
+      z-index: 1;
+    }
+
+    #plantMain {
+      position: relative;
+      z-index: 2;
+    }
+
+    .camera-overlay-gradient {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at bottom, rgba(0,0,0,0.65) 0, transparent 50%),
+                  linear-gradient(to top, rgba(15,23,42,0.9), transparent 35%);
+    }
+
+    .camera-controls {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: max(40px, calc(env(safe-area-inset-bottom, 0) + 32px));
+      padding: 0 16px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 15;
+      pointer-events: auto;
+    }
+
+    .camera-info {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-sub);
+      padding: 4px 4px 0;
+    }
+
+    .camera-info span {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .camera-button-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-size: 13px;
+      background: rgba(15, 23, 42, 0.90);
+      color: var(--text-main);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border-subtle);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #22c55e, #4ade80);
+      border-color: rgba(74, 222, 128, 0.7);
+      color: #022c22;
+      font-weight: 600;
+      box-shadow: 0 8px 22px rgba(22, 163, 74, 0.55);
+      min-width: 88px;
+      justify-content: center;
+    }
+
+    /* 촬영 버튼 높이를 축소/확대 버튼(40px)과 동일하게 */
+    #captureBtn {
+      height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-secondary {
+      padding-inline: 12px;
+      font-size: 12px;
+      color: var(--text-sub);
+      background: rgba(15, 23, 42, 0.9);
+    }
+
+    .size-controls {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      justify-content: center;
+      margin-top: 8px;
+      flex-wrap: nowrap;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .control-label {
+      font-size: 10px;
+      color: var(--text-sub);
+      white-space: nowrap;
+    }
+
+    .size-btn-small {
+      border-radius: 999px;
+      width: 40px;
+      height: 40px;
+      border: 1px solid rgba(75, 85, 99, 0.9);
+      background: rgba(15, 23, 42, 0.96);
+      color: #e5e7eb;
+      font-size: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.8);
+    }
+
+    #resetBtn.size-btn-small,
+    #changePlantBtn.size-btn-small {
+      font-size: 11px;
+      padding: 0 10px;
+      width: auto;
+      min-width: 64px;
+    }
+
+    .size-btn-small:active {
+      transform: translateY(1px) scale(0.96);
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.9);
+    }
+
+    /* ===== 확대/축소 슬라이더 ===== */
+    .depth-slider {
+      flex: 1;
+      display: flex;
+      justify-content: flex-start;
+    }
+
+    .depth-track {
+      position: relative;
+      width: 100%;
+      max-width: 260px;
+      height: 44px;
+      border-radius: 999px;
+      background: radial-gradient(circle at top, #111827 0, #020617 60%);
+      box-shadow:
+        0 14px 30px rgba(0, 0, 0, 0.85),
+        inset 0 0 0 1px rgba(148, 163, 184, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      padding: 0 22px;
+    }
+
+    .depth-label {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      color: #e5e7eb;
+      pointer-events: none;
+      opacity: 0.85;
+    }
+
+    .depth-label-left {
+      left: 14px;
+      text-align: left;
+    }
+
+    .depth-label-right {
+      right: 14px;
+      text-align: right;
+    }
+
+    .depth-thumb {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 36px;
+      height: 36px;
+      border-radius: 999px;
+      background: #e5e7eb;
+      box-shadow:
+        0 8px 18px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(0, 0, 0, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #111827;
+      font-size: 18px;
+      touch-action: none;
+    }
+
+    .depth-arrow { transform: translateX(1px); }
+
+    /* 토스트 메시지 */
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(120px, calc(32px + env(safe-area-inset-bottom, 0)));
+      transform: translateX(-50%);
+      padding: 10px 16px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-main);
+      font-size: 12px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+      z-index: 40;
+    }
+
+    .toast.active {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-4px);
+    }
+
+    /* 캡처 결과 오버레이 */
+    .capture-result {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.96);
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: calc(env(safe-area-inset-top, 0) + 40px) 16px calc(env(safe-area-inset-bottom, 0) + 40px);
+      z-index: 60;
+      overflow-y: auto;
+    }
+
+    .capture-result.active {
+      display: flex;
+    }
+
+    .capture-card {
+      width: 100%;
+      max-width: 420px;
+      background: rgba(15, 23, 42, 0.98);
+      border-radius: 20px;
+      padding: 18px 14px 16px;
+      border: 1px solid rgba(55, 65, 81, 0.9);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .capture-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      font-size: 13px;
+      color: #e5e7eb;
+      gap: 8px;
+    }
+
+    .capture-header small {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    .capture-close {
+      border: none;
+      background: rgba(239, 68, 68, 0.18);
+      color: #fecaca;
+      font-size: 22px;
+      padding: 0;
+      border-radius: 999px;
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(248, 113, 113, 0.9);
+      box-shadow: 0 6px 16px rgba(127, 29, 29, 0.7);
+    }
+
+    .capture-preview {
+      width: 100%;
+      border-radius: 16px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid rgba(31, 41, 55, 0.9);
+      text-align: center;
+    }
+
+    .capture-preview img {
+      max-width: 100%;
+      max-height: 80vh;
+      height: auto;
+      display: inline-block;
+    }
+
+    .capture-actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .capture-actions-main {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .capture-actions-main .btn {
+      flex: 1;
+      justify-content: center;
+    }
+
+    .btn-kakao {
+      background: #fee500;
+      color: #111827;
+      border-color: #eab308;
+      font-weight: 600;
+    }
+
+    .btn-outline {
+      background: transparent;
+      color: #e5e7eb;
+      border-color: rgba(148, 163, 184, 0.9);
+    }
+
+    .capture-note {
+      font-size: 11px;
+      color: #9ca3af;
+    }
+
+    /* 버전 표시 */
+    .version-badge {
+      position: fixed;
+      right: 8px;
+      bottom: calc(env(safe-area-inset-bottom, 0) + 4px);
+      font-size: 10px;
+      color: rgba(148, 163, 184, 0.8);
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 999px;
+      padding: 3px 8px;
+      border: 1px solid rgba(55, 65, 81, 0.8);
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    .no-select {
+      user-select: none;
+      -webkit-user-select: none;
+    }
+  </style>
+</head>
+<body>
+<div class="app no-select">
+  <!-- 공통 헤더 -->
+  <header class="app-header">
+    <div class="app-title">
+      <div class="app-title-main">나무다운</div>
+      <div class="app-title-sub">공간에 먼저 놓아 보고 고르는 식물</div>
+    </div>
+    <div class="step-indicator" id="stepIndicator">
+      <span class="step-dot"></span>
+      <span>1 / 2 · 식물 선택</span>
+    </div>
+  </header>
+
+  <!-- === 1. 식물 선택 화면 === -->
+  <section class="screen screen-list active" id="screenList">
+    <div class="intro-card">
+      <div class="intro-title">어떤 식물을 공간에 놓아볼까요?</div>
+      <div class="intro-desc">
+        아래에서 식물을 고르면, 카메라를 켜서 <strong>우리 집 공간에 놓인 모습</strong>을 바로 확인할 수 있어요.
+      </div>
+      <div class="tag-row">
+        <span class="tag highlight">실시간 미리보기</span>
+        <span class="tag">크기 조절</span>
+        <span class="tag">회전</span>
+        <span class="tag">모바일 전용</span>
+      </div>
+
+      <div class="plant-grid" id="plantGrid"></div>
+
+      <div class="bottom-helper">
+        <span>
+          <span class="dot-accent"></span>
+          식물을 탭하면 카메라 화면으로 전환됩니다.
+        </span>
+        <span>두 손가락으로 크기 · 회전 조절</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- === 2. 카메라 + 배치 화면 === -->
+  <section class="screen screen-camera" id="screenCamera">
+    <div class="camera-stage">
+      <video id="camera" autoplay playsinline muted></video>
+
+      <div id="plantWrapper" class="plant-wrapper">
+        <div class="plant-wrapper-inner">
+          <img src="" alt="Plant shadow" class="plant-image" id="plantShadow" />
+          <img src="" alt="Plant main"   class="plant-image" id="plantMain" />
+        </div>
+      </div>
+
+      <div class="camera-overlay-gradient"></div>
+
+      <div class="camera-controls">
+        <div class="camera-info">
+          <span>
+            <span class="dot-accent"></span>
+            손가락 한 개: 위치 이동 · 두 개: 크기/회전
+          </span>
+          <span id="plantNameLabel"></span>
+        </div>
+
+        <!-- 윗줄: 확대/축소 슬라이더 + 촬영 버튼 -->
+        <div class="camera-button-row">
+          <div class="depth-slider">
+            <div class="depth-track" id="depthTrack">
+              <div class="depth-thumb" id="depthThumb">
+                <span class="depth-arrow">›</span>
+              </div>
+              <span class="depth-label depth-label-left">축소</span>
+              <span class="depth-label depth-label-right">확대</span>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="captureBtn">촬영</button>
+        </div>
+
+        <!-- 아랫줄: 크기/회전/초기화/다른 식물 -->
+        <div class="size-controls">
+          <div class="control-group">
+            <button class="size-btn-small" id="smallerBtn">−</button>
+            <span class="control-label">축소</span>
+          </div>
+          <div class="control-group">
+            <button class="size-btn-small" id="biggerBtn">＋</button>
+            <span class="control-label">확대</span>
+          </div>
+          <div class="control-group">
+            <button class="size-btn-small" id="rotateBtn">↻</button>
+            <span class="control-label">회전</span>
+          </div>
+          <div class="control-group">
+            <button class="size-btn-small" id="resetBtn">초기화</button>
+            <span class="control-label">초기화</span>
+          </div>
+          <div class="control-group">
+            <button class="size-btn-small" id="changePlantBtn">다른 식물</button>
+            <span class="control-label">다른 식물</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 토스트 메시지 -->
+  <div id="toast" class="toast">준비중입니다.</div>
+
+  <!-- 캡처용 캔버스 (숨김) -->
+  <canvas id="captureCanvas" style="display:none;"></canvas>
+
+  <!-- 캡처 결과 오버레이 -->
+  <div class="capture-result" id="captureResult">
+    <div class="capture-card">
+      <div class="capture-header">
+        <div>
+          <div>촬영 결과</div>
+          <small>지금 화면 그대로 저장하거나 공유할 수 있어요.</small>
+        </div>
+        <button class="capture-close" id="captureCloseBtn" aria-label="닫기">×</button>
+      </div>
+      <div class="capture-preview">
+        <img id="capturedImage" src="" alt="Captured plant preview" />
+      </div>
+      <div class="capture-actions">
+        <div class="capture-actions-main">
+          <a class="btn btn-kakao" href="#" target="_blank">카카오톡 문의</a>
+          <a class="btn btn-outline" href="#" target="_blank">식물 구입</a>
+        </div>
+        <div class="capture-note">
+          이미지를 길게 눌러 사진첩에 저장하거나, 캡처 화면을 바로 공유해 보세요.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 버전 표시 -->
+  <div class="version-badge">v0.7.6</div>
+</div>
+
+<script>
+  // === 전역 설정값 ===
+  // 핀치 확대/회전 잠금: false = 잠김, true = 활성화
+  window.PLANT_GESTURE_ENABLED = false;
+  // 촬영 결과 미리보기 크기 비율 (정방향일 때만 사용)
+  if (typeof window.CAPTURE_PREVIEW_SCALE !== 'number') {
+    window.CAPTURE_PREVIEW_SCALE = 0.6; // 기본 60%
+  }
+
+  const screenList = document.getElementById('screenList');
+  const screenCamera = document.getElementById('screenCamera');
+  const stepIndicator = document.getElementById('stepIndicator');
+  const plantGrid = document.getElementById('plantGrid');
+  const plantShadow = document.getElementById('plantShadow');
+  const plantMain   = document.getElementById('plantMain');
+  const plantNameLabel = document.getElementById('plantNameLabel');
+  const captureBtn = document.getElementById('captureBtn');
+  const toastEl = document.getElementById('toast');
+  const cameraStage = document.querySelector('.camera-stage');
+  const rotateBtn = document.getElementById('rotateBtn');
+  const smallerBtn = document.getElementById('smallerBtn');
+  const biggerBtn = document.getElementById('biggerBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const changePlantBtn = document.getElementById('changePlantBtn');
+
+  const depthTrack = document.getElementById('depthTrack');
+  const depthThumb = document.getElementById('depthThumb');
+
+  const captureCanvas = document.getElementById('captureCanvas');
+  const captureResult = document.getElementById('captureResult');
+  const capturedImage = document.getElementById('capturedImage');
+  const captureCloseBtn = document.getElementById('captureCloseBtn');
+
+  let cameraStarted = false;
+  let selectedPlant = null;
+  let toastTimeout = null;
+
+  const plants = [
+    { id: 'plant_01', src: 'plant/plant_01.png', name: '플랜트 01', size: '대형' },
+    { id: 'plant_02', src: 'plant/plant_02.png', name: '플랜트 02', size: '대형' },
+    { id: 'plant_03', src: 'plant/plant_03.png', name: '플랜트 03', size: '대형' },
+    { id: 'plant_04', src: 'plant/plant_04.png', name: '플랜트 04', size: '중형' },
+    { id: 'plant_05', src: 'plant/plant_05.png', name: '플랜트 05', size: '소형' },
+    { id: 'plant_06', src: 'plant/plant_06.png', name: '플랜트 06', size: '소형' }
+  ];
+
+  function renderPlantList() {
+    plantGrid.innerHTML = '';
+    plants.forEach((plant) => {
+      const card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'plant-card';
+      card.dataset.plantId = plant.id;
+      card.innerHTML = `
+        <div class="plant-size-chip">${plant.size}</div>
+        <img src="${plant.src}" alt="${plant.name}" class="plant-thumb" loading="lazy">
+        <div class="plant-label">${plant.name}</div>
+      `;
+      card.addEventListener('click', () => onSelectPlant(plant));
+      plantGrid.appendChild(card);
+    });
+  }
+
+  function setStep(step) {
+    if (step === 1) {
+      stepIndicator.innerHTML = `
+        <span class="step-dot"></span>
+        <span>1 / 2 · 식물 선택</span>
+      `;
+    } else {
+      stepIndicator.innerHTML = `
+        <span class="step-dot"></span>
+        <span>2 / 2 · 공간에 배치해 보기</span>
+      `;
+    }
+  }
+
+  function showListScreen() {
+    screenCamera.classList.remove('active');
+    screenList.classList.add('active');
+    setStep(1);
+  }
+
+  function showCameraScreen() {
+    screenList.classList.remove('active');
+    screenCamera.classList.add('active');
+    setStep(2);
+  }
+
+  function onSelectPlant(plant) {
+    selectedPlant = plant;
+    plantShadow.src = plant.src;
+    plantMain.src   = plant.src;
+    plantNameLabel.textContent = plant.name || '';
+    resetPlantTransformAndSlider();
+    showCameraScreen();
+    if (!cameraStarted) {
+      startCamera();
+      cameraStarted = true;
+    }
+  }
+
+  changePlantBtn.addEventListener('click', showListScreen);
+
+  async function startCamera() {
+    const videoEl = document.getElementById('camera');
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+      videoEl.srcObject = stream;
+    } catch (err) {
+      console.error('카메라 접근 실패:', err);
+      alert('카메라를 사용할 수 없습니다. 권한을 허용했는지 확인해 주세요.');
+    }
+  }
+
+  const plantWrapper = document.getElementById('plantWrapper');
+
+  // 제스처/버튼용 스케일
+  let gestureScale = 1;
+  // 슬라이더용 스케일
+  let sliderRatio = 0.5; // 0~1, 가운데 시작
+  let sliderScale = 1;
+
+  let currentX = 0;
+  let currentY = 0;
+  let currentRotation = 0;
+
+  // 드래그용
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragBaseX = 0;
+  let dragBaseY = 0;
+
+  // 핀치/회전용
+  let pinchStartDistance = 0;
+  let pinchStartAngle = 0;
+  let pinchBaseScale = 1;
+  let pinchBaseRotation = 0;
+
+  let lastTouchCount = 0;
+
+  function recomputeSliderScale() {
+    const offset = (sliderRatio - 0.5) * 2; // -1 ~ 1
+    const factor = 1 + offset * 0.6;        // 0.4 ~ 1.6
+    sliderScale = Math.max(0.4, Math.min(1.6, factor));
+  }
+
+  function applyTransform() {
+    const effectiveScale = gestureScale * sliderScale;
+    plantWrapper.style.transform =
+      `translate3d(calc(-50% + ${currentX}px), calc(-50% + ${currentY}px), 0) ` +
+      `scale(${effectiveScale}) rotate(${currentRotation}deg)`;
+  }
+
+  function resetPlantTransformAndSlider() {
+    currentX = 0;
+    currentY = 0;
+    currentRotation = 0;
+    gestureScale = 1;
+    sliderRatio = 0.5;
+    recomputeSliderScale();
+    applyTransform();
+    updateSliderThumbPosition();
+  }
+
+  function getDistance(t1, t2) {
+    const dx = t2.clientX - t1.clientX;
+    const dy = t2.clientY - t1.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function getAngle(t1, t2) {
+    const dx = t2.clientX - t1.clientX;
+    const dy = t2.clientY - t1.clientY;
+    return Math.atan2(dy, dx) * 180 / Math.PI;
+  }
+
+  cameraStage.addEventListener('touchstart', (e) => {
+    if (e.target.closest('.camera-controls')) return;
+
+    e.preventDefault();
+
+    const touchCount = e.touches.length;
+    lastTouchCount = touchCount;
+
+    if (touchCount === 1) {
+      // 이동: 항상 허용
+      const t = e.touches[0];
+      dragStartX = t.clientX;
+      dragStartY = t.clientY;
+      dragBaseX = currentX;
+      dragBaseY = currentY;
+    } else if (touchCount === 2) {
+      // 핀치/회전: 잠금 변수 체크
+      if (!window.PLANT_GESTURE_ENABLED) return;
+      const [t1, t2] = e.touches;
+      pinchStartDistance = getDistance(t1, t2);
+      pinchStartAngle = getAngle(t1, t2);
+      pinchBaseScale = gestureScale;
+      pinchBaseRotation = currentRotation;
+    }
+  }, { passive: false });
+
+  cameraStage.addEventListener('touchmove', (e) => {
+    if (e.target.closest('.camera-controls')) return;
+
+    e.preventDefault();
+
+    const touchCount = e.touches.length;
+
+    if (touchCount !== lastTouchCount) {
+      lastTouchCount = touchCount;
+      if (touchCount === 1) {
+        const t = e.touches[0];
+        dragStartX = t.clientX;
+        dragStartY = t.clientY;
+        dragBaseX = currentX;
+        dragBaseY = currentY;
+      } else if (touchCount === 2) {
+        if (!window.PLANT_GESTURE_ENABLED) return;
+        const [t1, t2] = e.touches;
+        pinchStartDistance = getDistance(t1, t2);
+        pinchStartAngle = getAngle(t1, t2);
+        pinchBaseScale = gestureScale;
+        pinchBaseRotation = currentRotation;
+      }
+      return;
+    }
+
+    if (touchCount === 1) {
+      // 안정적인 드래그: 시작점 기준
+      const t = e.touches[0];
+      const dx = t.clientX - dragStartX;
+      const dy = t.clientY - dragStartY;
+      currentX = dragBaseX + dx;
+      currentY = dragBaseY + dy;
+      applyTransform();
+    } else if (touchCount === 2) {
+      if (!window.PLANT_GESTURE_ENABLED) return;
+
+      const [t1, t2] = e.touches;
+      const dist = getDistance(t1, t2);
+      const angle = getAngle(t1, t2);
+
+      const scaleFactor = dist / pinchStartDistance;
+      gestureScale = Math.max(0.2, Math.min(4, pinchBaseScale * scaleFactor));
+
+      const angleDelta = angle - pinchStartAngle;
+      currentRotation = pinchBaseRotation + angleDelta;
+
+      applyTransform();
+    }
+  }, { passive: false });
+
+  cameraStage.addEventListener('touchend', (e) => {
+    if (e.target.closest('.camera-controls')) return;
+    lastTouchCount = e.touches.length;
+  }, { passive: false });
+
+  // 버튼 길게 누르기
+  function setupHoldButton(button, bigStepFn, smallStepFn) {
+    let delayTimer = null;
+    let repeatTimer = null;
+    let holding = false;
+
+    const clearTimers = () => {
+      if (delayTimer) {
+        clearTimeout(delayTimer);
+        delayTimer = null;
+      }
+      if (repeatTimer) {
+        clearInterval(repeatTimer);
+        repeatTimer = null;
+      }
+    };
+
+    const start = (e) => {
+      e.preventDefault();
+      clearTimers();
+      holding = false;
+
+      delayTimer = setTimeout(() => {
+        holding = true;
+        smallStepFn();
+        repeatTimer = setInterval(smallStepFn, 80);
+      }, 220);
+    };
+
+    const end = () => {
+      const wasHolding = holding;
+      clearTimers();
+      holding = false;
+      if (!wasHolding) {
+        bigStepFn();
+      }
+    };
+
+    button.addEventListener('mousedown', start);
+    button.addEventListener('touchstart', start, { passive: false });
+    ['mouseup', 'mouseleave'].forEach(ev => button.addEventListener(ev, end));
+    ['touchend', 'touchcancel'].forEach(ev => button.addEventListener(ev, end));
+  }
+
+  setupHoldButton(
+    smallerBtn,
+    () => {
+      gestureScale = Math.max(0.2, gestureScale - 0.15);
+      applyTransform();
+    },
+    () => {
+      gestureScale = Math.max(0.2, gestureScale - 0.02);
+      applyTransform();
+    }
+  );
+
+  setupHoldButton(
+    biggerBtn,
+    () => {
+      gestureScale = Math.min(4, gestureScale + 0.15);
+      applyTransform();
+    },
+    () => {
+      gestureScale = Math.min(4, gestureScale + 0.02);
+      applyTransform();
+    }
+  );
+
+  rotateBtn.addEventListener('click', () => {
+    currentRotation += 90;
+    applyTransform();
+  });
+
+  resetBtn.addEventListener('click', () => {
+    resetPlantTransformAndSlider();
+  });
+
+  function showToast(message) {
+    if (!toastEl) return;
+    toastEl.textContent = message || '준비중입니다.';
+    toastEl.classList.add('active');
+    if (toastTimeout) clearTimeout(toastTimeout);
+    toastTimeout = setTimeout(() => {
+      toastEl.classList.remove('active');
+    }, 1500);
+  }
+
+  // ===== 촬영 → 캔버스로 합성 후 결과 오버레이 =====
+  captureBtn.addEventListener('click', () => {
+    const video = document.getElementById('camera');
+    if (!video || !plantMain || !plantShadow) {
+      showToast('촬영에 필요한 요소를 찾을 수 없습니다.');
+      return;
+    }
+
+    const videoRect = video.getBoundingClientRect();
+    const plantInner = document.querySelector('.plant-wrapper-inner');
+    if (!plantInner) {
+      showToast('식물 위치 정보를 찾을 수 없습니다.');
+      return;
+    }
+    const plantRect = plantInner.getBoundingClientRect();
+
+    if (videoRect.width === 0 || videoRect.height === 0) {
+      showToast('카메라 화면을 불러오는 중입니다.');
+      return;
+    }
+
+    captureCanvas.width = videoRect.width;
+    captureCanvas.height = videoRect.height;
+
+    const ctx = captureCanvas.getContext('2d');
+    if (!ctx) {
+      showToast('이미지를 만들 수 없습니다.');
+      return;
+    }
+
+    // 1) 카메라 프레임: object-fit: cover와 동일하게 잘라서 그림
+    try {
+      const vw = video.videoWidth || videoRect.width;
+      const vh = video.videoHeight || videoRect.height;
+      const cw = captureCanvas.width;
+      const ch = captureCanvas.height;
+
+      const videoRatio = vw / vh;
+      const canvasRatio = cw / ch;
+
+      let sx, sy, sw, sh;
+      if (videoRatio > canvasRatio) {
+        // 비디오가 더 가로로 긴 경우: 좌우 잘라냄
+        sh = vh;
+        sw = vh * canvasRatio;
+        sx = (vw - sw) / 2;
+        sy = 0;
+      } else {
+        // 비디오가 더 세로로 긴 경우: 위아래 잘라냄
+        sw = vw;
+        sh = vw / canvasRatio;
+        sx = 0;
+        sy = (vh - sh) / 2;
+      }
+
+      ctx.save();
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, cw, ch);
+      ctx.restore();
+    } catch (e) {
+      console.warn('비디오 드로우 실패:', e);
+    }
+
+    // 2) 식물 (그림자 + 본체) 오버레이
+    const scaleX = captureCanvas.width / videoRect.width;
+    const scaleY = captureCanvas.height / videoRect.height;
+
+    const centerX =
+      (plantRect.left - videoRect.left + plantRect.width / 2) * scaleX;
+    const centerY =
+      (plantRect.top - videoRect.top + plantRect.height / 2) * scaleY;
+
+    const drawWidth = plantRect.width * scaleX;
+    const drawHeight = plantRect.height * scaleY;
+
+    const rad = currentRotation * Math.PI / 180;
+    const effectiveScale = gestureScale * sliderScale;
+
+    const normRot = ((currentRotation % 360) + 360) % 360;
+    let baseW = drawWidth / effectiveScale;
+    let baseH = drawHeight / effectiveScale;
+    if (Math.abs(normRot - 90) < 0.5 || Math.abs(normRot - 270) < 0.5) {
+      const tmp = baseW;
+      baseW = baseH;
+      baseH = tmp;
+    }
+
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(rad);
+    ctx.scale(effectiveScale, effectiveScale);
+
+    try {
+      ctx.drawImage(
+        plantShadow,
+        -baseW / 2,
+        -baseH / 2,
+        baseW,
+        baseH
+      );
+    } catch (e) {
+      console.warn('shadow draw error', e);
+    }
+
+    try {
+      ctx.drawImage(
+        plantMain,
+        -baseW / 2,
+        -baseH / 2,
+        baseW,
+        baseH
+      );
+    } catch (e) {
+      console.warn('main draw error', e);
+    }
+
+    ctx.restore();
+
+    // 3) 90도 / 270도 회전인 경우 결과 전체를 회전해서 저장
+    let finalCanvas = captureCanvas;
+    const isSide =
+      Math.abs(normRot - 90) < 0.5 ||
+      Math.abs(normRot - 270) < 0.5;
+
+    if (isSide) {
+      const rotatedCanvas = document.createElement('canvas');
+      rotatedCanvas.width = captureCanvas.height;
+      rotatedCanvas.height = captureCanvas.width;
+      const rctx = rotatedCanvas.getContext('2d');
+      rctx.save();
+      if (Math.abs(normRot - 90) < 0.5) {
+        // 90도 회전한 상태로 찍었으면 결과는 -90도로 보정
+        rctx.translate(0, rotatedCanvas.height);
+        rctx.rotate(-Math.PI / 2);
+      } else {
+        // -90도(=270도) 회전한 상태로 찍었으면 결과는 +90도로 보정
+        rctx.translate(rotatedCanvas.width, 0);
+        rctx.rotate(Math.PI / 2);
+      }
+      rctx.drawImage(captureCanvas, 0, 0);
+      rctx.restore();
+      finalCanvas = rotatedCanvas;
+    }
+
+    try {
+      const dataUrl = finalCanvas.toDataURL('image/png');
+      capturedImage.src = dataUrl;
+
+      // === 정방향일 때만 CAPTURE_PREVIEW_SCALE 적용 ===
+      if (!isSide) {
+        const scale =
+          typeof window.CAPTURE_PREVIEW_SCALE === 'number' &&
+          window.CAPTURE_PREVIEW_SCALE > 0
+            ? window.CAPTURE_PREVIEW_SCALE
+            : 0.6;
+        capturedImage.style.width = (scale * 100) + '%';
+      } else {
+        // 90도 촬영 결과는 꽉 차게
+        capturedImage.style.width = '100%';
+      }
+      capturedImage.style.height = 'auto';
+
+      captureResult.classList.add('active');
+    } catch (e) {
+      console.error('toDataURL error:', e);
+      showToast('이미지 생성에 실패했습니다.');
+    }
+  });
+
+  captureCloseBtn.addEventListener('click', () => {
+    captureResult.classList.remove('active');
+  });
+
+  // ===== 슬라이더(확대/축소) 로직 =====
+  let sliderDragging = false;
+  let sliderTrackRect = null;
+
+  function setSliderFromRatio(ratio) {
+    const clamped = Math.max(0, Math.min(1, ratio));
+    sliderRatio = clamped;
+    recomputeSliderScale();
+    updateSliderThumbPosition();
+    applyTransform();
+  }
+
+  function updateSliderThumbPosition() {
+    if (!depthTrack || !depthThumb) return;
+    const trackRect = depthTrack.getBoundingClientRect();
+    const thumbRect = depthThumb.getBoundingClientRect();
+    const minLeft = 8;
+    const maxLeft = trackRect.width - thumbRect.width - 8;
+    const left = minLeft + (maxLeft - minLeft) * sliderRatio;
+    depthThumb.style.left = left + 'px';
+  }
+
+  function startSliderDrag(clientX) {
+    sliderDragging = true;
+    sliderTrackRect = depthTrack.getBoundingClientRect();
+    updateSliderFromClientX(clientX);
+  }
+
+  function updateSliderFromClientX(clientX) {
+    if (!sliderTrackRect) {
+      sliderTrackRect = depthTrack.getBoundingClientRect();
+    }
+    const ratio = (clientX - sliderTrackRect.left) / sliderTrackRect.width;
+    setSliderFromRatio(ratio);
+  }
+
+  depthTrack.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startSliderDrag(e.clientX);
+  });
+
+  depthThumb.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    startSliderDrag(e.clientX);
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!sliderDragging) return;
+    e.preventDefault();
+    updateSliderFromClientX(e.clientX);
+  });
+
+  window.addEventListener('mouseup', () => {
+    sliderDragging = false;
+  });
+
+  depthTrack.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    e.preventDefault();
+    startSliderDrag(t.clientX);
+  }, { passive: false });
+
+  depthThumb.addEventListener('touchstart', (e) => {
+    const t = e.touches[0];
+    e.preventDefault();
+    startSliderDrag(t.clientX);
+  }, { passive: false });
+
+  window.addEventListener('touchmove', (e) => {
+    if (!sliderDragging) return;
+    const t = e.touches[0];
+    e.preventDefault();
+    updateSliderFromClientX(t.clientX);
+  }, { passive: false });
+
+  window.addEventListener('touchend', () => {
+    sliderDragging = false;
+  });
+
+  window.addEventListener('resize', () => {
+    updateSliderThumbPosition();
+  });
+
+  // 초기 세팅
+  renderPlantList();
+  resetPlantTransformAndSlider();
+  setStep(1);
+</script>
+</body>
+</html>

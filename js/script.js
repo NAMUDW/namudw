@@ -81,10 +81,10 @@ function setPlantLoading(flag) {
       const card = document.createElement('div');
       card.className = 'plant-card';
       card.innerHTML = `
-            <div class="skeleton-thumb"></div>
-            <div class="skeleton-line"></div>
-            <div class="skeleton-line small"></div>
-          `;
+        <div class="skeleton-thumb"></div>
+        <div class="skeleton-line"></div>
+        <div class="skeleton-line small"></div>
+      `;
       plantGrid.appendChild(card);
     }
   } else {
@@ -92,11 +92,11 @@ function setPlantLoading(flag) {
   }
 }
 
-// ★★★ Plant API 호출
-// ★★★ Plant API 호출
+// ★★★ Plant API 호출 (이 버전만 사용)
 async function fetchPlantList() {
   setPlantLoading(true);
   try {
+    // sold_out=true → 백엔드에서 "판매중(ON_SALE)"만 내려주도록 구현돼 있음
     const res = await fetch(`${API_BASE_URL}/plants/?sold_out=true`, {
       method: 'GET'
     });
@@ -106,14 +106,22 @@ async function fetchPlantList() {
     const data = await res.json();
     const results = data.results || [];
 
+    // size_type / size_type_label 우선, 없으면 status / status_label 사용
     plants = results.map(p => {
-      // 1. 사이즈 라벨 처리
-      let sizeCategory = p.status_label;
-      if (!sizeCategory && p.status) {
-        if (p.status === 'B') sizeCategory = '대형';
-        else if (p.status === 'M') sizeCategory = '중형';
-        else if (p.status === 'S') sizeCategory = '소형';
+      // 1. 크기 코드/라벨
+      let sizeCode  = p.size_type || p.status || null;              // 'B','M','S'
+      let sizeLabel = p.size_type_label || p.status_label || '';    // '대형','중형','소형'
+
+      // 라벨만 있고 코드 없으면 라벨로 코드 추론
+      if (!sizeCode && sizeLabel) {
+        if (sizeLabel.includes('대')) sizeCode = 'B';
+        else if (sizeLabel.includes('중')) sizeCode = 'M';
+        else if (sizeLabel.includes('소')) sizeCode = 'S';
       }
+
+      // 둘 다 없으면 기본값
+      if (!sizeCode)  sizeCode  = 'M';
+      if (!sizeLabel) sizeLabel = '중형';
 
       // 2. 사이즈 cm 처리
       let sizeCm = '';
@@ -129,23 +137,22 @@ async function fetchPlantList() {
           ? p.image_base64
           : 'data:image/png;base64,' + p.image_base64;
       } else {
-        // ★ 여기만 변경
         thumbSrc = 'img/dummy-plant.png';
       }
 
-      // ★★★ [수정됨] 숫자 ID를 받아 전체 URL로 변환하여 저장
-      let finalLink = SMART_STORE_URL; // 기본값
+      // 4. SmartStore 링크 (숫자 ID → 전체 URL)
+      let finalLink = SMART_STORE_URL;
       if (p.link) {
-        // API에서 "12345" 같은 숫자만 온다고 가정하고 URL 조합
         finalLink = `${SMART_STORE_URL}/products/${p.link}`;
       }
 
       return {
         id: p.id,
         name: p.name || '이름 없는 식물',
-        link: finalLink, // 이제 여기에는 항상 완전한 https 주소가 들어감
-        sizeCategory: sizeCategory || '중형',
-        sizeCm: sizeCm,
+        link: finalLink,            // 완전한 URL
+        sizeCode: sizeCode,         // 'B','M','S'
+        sizeLabel: sizeLabel,       // '대형','중형','소형'
+        sizeCm: sizeCm,             // '70cm' 등
         price: p.price ?? null,
         isSoldOut: !!p.is_sold_out,
         thumbSrc: thumbSrc
@@ -160,12 +167,18 @@ async function fetchPlantList() {
   }
 }
 
+// ★★★ 리스트 렌더링 (사이즈 탭 필터 반영)
 function renderPlantList() {
   plantGrid.innerHTML = '';
 
   const filtered = plants.filter(p => {
     if (currentSizeFilter === 'ALL') return true;
-    return p.sizeCategory === currentSizeFilter;
+
+    // 탭이 'B/M/S'이든 '대형/중형/소형'이든 둘 다 지원
+    return (
+      p.sizeCode === currentSizeFilter ||   // 코드 비교
+      p.sizeLabel === currentSizeFilter     // 라벨 비교
+    );
   });
 
   if (!filtered.length) {
@@ -181,7 +194,7 @@ function renderPlantList() {
     card.type = 'button';
     card.className = 'plant-card';
     card.dataset.plantId = plant.id;
-    
+
     const priceText = plant.price != null ? plant.price.toLocaleString() + '원' : '';
 
     card.innerHTML = `
@@ -190,7 +203,7 @@ function renderPlantList() {
       <div class="plant-label">
         <div class="plant-label-name">${plant.name}</div>
         <div class="plant-label-meta">
-          <span>${plant.sizeCategory}</span>
+          <span>${plant.sizeLabel}</span>
           ${plant.sizeCm ? `<span class="meta-dot">·</span><span>${plant.sizeCm}</span>` : ''}
         </div>
       </div>
@@ -201,10 +214,13 @@ function renderPlantList() {
   });
 }
 
+// 크기 탭 클릭 처리
 sizeTabs.querySelectorAll('.size-tab').forEach(tab => {
   tab.addEventListener('click', () => {
     sizeTabs.querySelectorAll('.size-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
+
+    // data-size="ALL" | "B" | "M" | "S" 또는 "대형"/"중형"/"소형"
     currentSizeFilter = tab.dataset.size || 'ALL';
     renderPlantList();
   });
@@ -213,9 +229,7 @@ sizeTabs.querySelectorAll('.size-tab').forEach(tab => {
 // ★★★ SmartStore 품절/누락 동기화 + 리스트 새로고침
 async function syncSoldoutAndReload() {
   if (!refreshBtn) return;
-
-  // 이미 로딩 중이면 중복 요청 방지
-  if (refreshBtn.dataset.loading === '1') return;
+  if (refreshBtn.dataset.loading === '1') return;  // 중복 요청 방지
 
   refreshBtn.dataset.loading = '1';
   refreshBtn.classList.add('loading');
@@ -226,7 +240,7 @@ async function syncSoldoutAndReload() {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({}) // 백엔드에서 html이 필요 없다고 가정
+      body: JSON.stringify({})
     });
 
     if (!res.ok) {
@@ -234,18 +248,12 @@ async function syncSoldoutAndReload() {
       throw new Error('sync API error: ' + res.status);
     }
 
-    // 필요하면 응답 내용도 확인 가능
-    // const data = await res.json();
-
     console.log('품절 동기화 성공');
     showToast('품절 상태를 새로고침했습니다.');
   } catch (err) {
-    // console.error('품절 동기화 중 오류 발생:', err);
     console.log('품절 동기화 실패');
-    // showToast('품절 상태 새로고침에 실패했습니다.');
   } finally {
     try {
-      // ★★★ 성공/실패 관계없이 항상 리스트 새로고침
       await fetchPlantList();
     } catch (listErr) {
       console.error('식물 리스트 새로고침 중 오류:', listErr);
@@ -256,7 +264,6 @@ async function syncSoldoutAndReload() {
   }
 }
 
-// 새로고침 버튼 클릭 시 동기화 실행
 if (refreshBtn) {
   refreshBtn.addEventListener('click', () => {
     syncSoldoutAndReload();
@@ -744,3 +751,15 @@ window.addEventListener('resize', updateSliderThumbPosition);
 fetchPlantList();             
 resetPlantTransformAndSlider();
 setStep(1);
+
+// 헤더 타이틀 클릭 → 메인(리스트 화면) 이동
+document.getElementById('appTitle').addEventListener('click', () => {
+  // 캡처 결과 화면이 떠 있으면 닫기
+  captureResult.classList.remove('active');
+
+  // 리스트로 이동
+  showListScreen();
+
+  // 모드 선택 창(open 되어 있다면) 닫기
+  modeDialog.classList.remove('active');
+});

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>AR Preview</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #000;
+    }
+
+    /* 거실 배경 */
+    .stage {
+      position: relative;
+      width: 100%;
+      max-width: 1100px;      /* 필요하면 조절 */
+      aspect-ratio: 21 / 9;   /* 가로로 긴 화면 */
+      background-image: url("img/living-room3.png"); /* 거실 PNG */
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      overflow: hidden;
+    }
+
+    /* 거실 위를 좌우로 움직이는 폰 */
+    .phone {
+      position: absolute;
+      top: 5%;          /* 위 여백 5% */
+      height: 90%;      /* 위·아래 각각 5% 여백 */
+      width: auto;
+      object-fit: contain;
+      animation: move-phone 8s ease-in-out infinite alternate;
+      pointer-events: none;
+    }
+
+    @keyframes move-phone {
+      0%   { left: 5%; }
+      50%  { left: 35%; }
+      100% { left: 65%; }
+    }
+
+    @media (max-width: 768px) {
+      .stage {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="stage">
+    <!-- 투명 PNG 핸드폰 (식물 포함된 화면) -->
+    <img src="img/phone-ar.png" alt="" class="phone" />
+  </div>
+</body>
+</html>
