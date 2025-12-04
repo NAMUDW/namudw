@@ -93,18 +93,50 @@ function setPlantLoading(flag) {
 }
 
 // ★★★ Plant API 호출 (이 버전만 사용)
+// ★★★ Plant API 호출 (백엔드 실패 시 plant/plant.json 폴백)
 async function fetchPlantList() {
   setPlantLoading(true);
+
   try {
-    // sold_out=true → 백엔드에서 "판매중(ON_SALE)"만 내려주도록 구현돼 있음
-    const res = await fetch(`${API_BASE_URL}/plants/?sold_out=true`, {
-      method: 'GET'
-    });
-    if (!res.ok) {
-      throw new Error('API error: ' + res.status);
+    let results = [];
+
+    // 1) 먼저 백엔드 시도
+    let res;
+    try {
+      res = await fetch(`${API_BASE_URL}/plants/?sold_out=true`, {
+        method: 'GET'
+      });
+    } catch (e) {
+      // 네트워크 에러(fetch 자체 실패) → 바로 폴백으로
+      console.error('백엔드 fetch 자체 실패, 로컬 JSON으로 폴백:', e);
+      res = null;
     }
-    const data = await res.json();
-    const results = data.results || [];
+
+    if (res && res.ok) {
+      // 백엔드 정상 응답
+      const data = await res.json();
+      results = data.results || data || [];
+    } else {
+      // 2) 백엔드가 500/404 등 에러거나 아예 실패 → plant/plant.json 폴백
+      console.warn('백엔드 응답이 없거나 상태 코드가 오류 → plant/plant.json 사용');
+      const localRes = await fetch('plant/plant.json', {
+        method: 'GET',
+        cache: 'no-store'
+      });
+
+      if (!localRes.ok) {
+        throw new Error('plant/plant.json 로드 실패: ' + localRes.status);
+      }
+
+      const localData = await localRes.json();
+      results = localData.results || localData || [];
+
+      // 폴백임을 사용자에게 알려주기
+      // showToast('백엔드 서버에 연결되지 않아 임시 데이터로 표시합니다.');
+      console.log('백엔드 서버에 연결되지 않아 임시 데이터로 표시합니다.');
+    }
+
+    // console.log('plant results:', results);
 
     // size_type / size_type_label 우선, 없으면 status / status_label 사용
     plants = results.map(p => {
@@ -158,9 +190,11 @@ async function fetchPlantList() {
         thumbSrc: thumbSrc
       };
     });
+
   } catch (err) {
     console.error('식물 리스트를 가져오는 중 오류:', err);
     showToast('식물 목록을 불러오지 못했습니다.');
+    plants = [];
   } finally {
     setPlantLoading(false);
     renderPlantList();
