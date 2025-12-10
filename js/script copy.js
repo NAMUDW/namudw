@@ -6,13 +6,6 @@ const API_BASE_URL = (typeof apiGlobalURL !== 'undefined' ? apiGlobalURL : '') +
 const SMART_STORE_URL = 'https://smartstore.naver.com/namu_dw';
 const INSTA_URL = 'https://www.instagram.com/namu_dw/';
 
-// ★★★ 식물 썸네일 크기 전역 스케일 (소형 60%, 중형 80%, 대형 100%)
-window.PLANT_THUMB_SCALE = {
-  B: 1.0, // 대형
-  M: 0.8, // 중형
-  S: 0.6  // 소형
-};
-
 window.SHADOW_OPACITY = 0.6;
 document.documentElement.style.setProperty('--shadow-opacity', window.SHADOW_OPACITY);
 
@@ -100,6 +93,7 @@ function setPlantLoading(flag) {
 }
 
 // ★★★ Plant API 호출 실패시 붉은 점 표시
+
 function setStepDotFallback(isFallback) {
   const dot = document.querySelector('.step-dot');
   if (!dot) return;
@@ -157,11 +151,13 @@ async function fetchPlantList() {
       console.log('백엔드 서버에 연결되지 않아 임시 데이터로 표시합니다.');
     }
 
+    // console.log('plant results:', results);
+
     // size_type / size_type_label 우선, 없으면 status / status_label 사용
     plants = results.map(p => {
       // 1. 크기 코드/라벨
-      let sizeCode = p.size_type || p.status || null; // 'B','M','S'
-      let sizeLabel = p.size_type_label || p.status_label || ''; // '대형','중형','소형'
+      let sizeCode  = p.size_type || p.status || null;              // 'B','M','S'
+      let sizeLabel = p.size_type_label || p.status_label || '';    // '대형','중형','소형'
 
       // 라벨만 있고 코드 없으면 라벨로 코드 추론
       if (!sizeCode && sizeLabel) {
@@ -171,7 +167,7 @@ async function fetchPlantList() {
       }
 
       // 둘 다 없으면 기본값
-      if (!sizeCode) sizeCode = 'M';
+      if (!sizeCode)  sizeCode  = 'M';
       if (!sizeLabel) sizeLabel = '중형';
 
       // 2. 사이즈 cm 처리
@@ -200,10 +196,10 @@ async function fetchPlantList() {
       return {
         id: p.id,
         name: p.name || '이름 없는 식물',
-        link: finalLink, // 완전한 URL
-        sizeCode: sizeCode, // 'B','M','S'
-        sizeLabel: sizeLabel, // '대형','중형','소형'
-        sizeCm: sizeCm, // '70cm' 등
+        link: finalLink,            // 완전한 URL
+        sizeCode: sizeCode,         // 'B','M','S'
+        sizeLabel: sizeLabel,       // '대형','중형','소형'
+        sizeCm: sizeCm,             // '70cm' 등
         price: p.price ?? null,
         isSoldOut: !!p.is_sold_out,
         thumbSrc: thumbSrc
@@ -229,8 +225,8 @@ function renderPlantList() {
 
     // 탭이 'B/M/S'이든 '대형/중형/소형'이든 둘 다 지원
     return (
-      p.sizeCode === currentSizeFilter || // 코드 비교
-      p.sizeLabel === currentSizeFilter   // 라벨 비교
+      p.sizeCode === currentSizeFilter ||   // 코드 비교
+      p.sizeLabel === currentSizeFilter     // 라벨 비교
     );
   });
 
@@ -250,39 +246,9 @@ function renderPlantList() {
 
     const priceText = plant.price != null ? plant.price.toLocaleString() + '원' : '';
 
-    // ★★★ 전역 스케일에서 썸네일 배율 가져오기
-    const scaleMap = window.PLANT_THUMB_SCALE || {};
-    let thumbScale = 1.0;
-
-    if (scaleMap[plant.sizeCode]) {
-      thumbScale = scaleMap[plant.sizeCode];
-    } else {
-      // 혹시 코드가 없고 라벨만 있는 경우 라벨 기준으로 보정
-      if (plant.sizeLabel.includes('소')) thumbScale = scaleMap.S || 0.6;
-      else if (plant.sizeLabel.includes('중')) thumbScale = scaleMap.M || 0.8;
-      else if (plant.sizeLabel.includes('대')) thumbScale = scaleMap.B || 1.0;
-    }
-
-    // ★★★ 이미지: 좌우 중앙, 위아래는 카드 영역의 아래쪽에 맞춰 배치
-    // plant-card가 flex-column일 것을 가정하고, thumb-wrap을 flex:1로 늘려서 아래로 붙임
     card.innerHTML = `
       ${priceText ? `<div class="plant-price-chip">${priceText}</div>` : ''}
-      <div class="plant-thumb-wrap"
-           style="
-             display:flex;
-             justify-content:center;
-             align-items:flex-end;
-             flex:1 0 auto;
-             width:100%;
-           ">
-        <img
-          src="${plant.thumbSrc}"
-          alt="${plant.name}"
-          class="plant-thumb"
-          loading="lazy"
-          style="transform: scale(${thumbScale}); transform-origin: center bottom;"
-        >
-      </div>
+      <img src="${plant.thumbSrc}" alt="${plant.name}" class="plant-thumb" loading="lazy">
       <div class="plant-label">
         <div class="plant-label-name">${plant.name}</div>
         <div class="plant-label-meta">
@@ -368,11 +334,11 @@ function onSelectPlant(plant) {
   plantShadow.src = plant.thumbSrc;
   plantMain.src = plant.thumbSrc;
 
-  // 카메라 상단 라벨 (sizeLabel 사용)
+  // 카메라 상단 라벨
   if (plant.sizeCm) {
-    plantNameLabel.textContent = `${plant.name} · ${plant.sizeLabel} · ${plant.sizeCm}`;
+    plantNameLabel.textContent = `${plant.name} · ${plant.sizeCategory} · ${plant.sizeCm}`;
   } else {
-    plantNameLabel.textContent = `${plant.name} · ${plant.sizeLabel}`;
+    plantNameLabel.textContent = `${plant.name} · ${plant.sizeCategory}`;
   }
 
   modeDialog.classList.add('active');
@@ -716,8 +682,9 @@ captureBtn.addEventListener('click', () => {
       capturedImage.style.objectFit = 'contain';
     }
 
-    // ★★★ 구입 버튼 링크 설정
+    // ★★★ [수정됨] 구입 버튼 링크 설정
     if (purchaseBtn) {
+      // selectedPlant.link에는 fetchPlantList에서 생성한 완전한 URL이 들어있습니다.
       purchaseBtn.href = (selectedPlant && selectedPlant.link) ? selectedPlant.link : SMART_STORE_URL;
       purchaseBtn.target = '_blank';
       purchaseBtn.rel = 'noopener';
@@ -762,7 +729,7 @@ if (changePlantResultBtn) {
   changePlantResultBtn.addEventListener('click', () => {
     // 결과 모달 닫고 리스트 화면으로 이동
     captureResult.classList.remove('active');
-    showListScreen();
+    showListScreen();      // 이미 위에서 정의된 함수 재사용
   });
 }
 
@@ -830,7 +797,7 @@ window.addEventListener('touchend', () => sDragging = false);
 window.addEventListener('resize', updateSliderThumbPosition);
 
 // 초기화
-fetchPlantList();
+fetchPlantList();             
 resetPlantTransformAndSlider();
 setStep(1);
 
